@@ -17,10 +17,6 @@ typedef struct EntradaTablaPagina{
     char valido; //Ver si existe o no un Page Fault
 } EntradaTablaPagina;
 
-//memoria fisica
-char memoria_fisica[PHYSICAL_MEMORY_SIZE];
-//tabla de paginas
-EntradaTablaPagina tabla_paginas[PAGE_TABLE_ENTRIES];
 
 int main (int argc, char *argv[]) {
 
@@ -55,6 +51,11 @@ int main (int argc, char *argv[]) {
         printf("Error al abrir el archivo de Backing Store\n");
         exit(1);
     }
+
+    //Asignar memoria para la memoria fisica
+    char **memoria_fisica = (char **) malloc(sizeof(char *) * PHYSICAL_MEMORY_SIZE);
+    //Asignar memoria para la tabla de paginas
+    EntradaTablaPagina *tabla_paginas = (EntradaTablaPagina *) malloc(sizeof(EntradaTablaPagina) * PAGE_TABLE_ENTRIES);
     //Lectura del archivo e imprime en pantalla cada una de las direcciones
     while(fgets(buffer, sizeof(buffer), archivo_direcciones) != NULL) {
         uint32_t direccion_virtual = strtoul(buffer, NULL, 10);
@@ -65,26 +66,34 @@ int main (int argc, char *argv[]) {
         uint32_t vpn = (direccion_virtual >> 8) & 0xFF; 
         //Si la entrada en la tabla de paginas no es valida, se carga la pagina desde el Backing Store
         if (!(tabla_paginas[vpn].valido)) {
-            char *buffer_pagina = (char *) malloc(sizeof(char) * FRAME_SIZE);
+            //Se asigna memoria para el buffer de la pagina
+            char *buffer_pagina = (char *) malloc(sizeof(char) * PAGE_SIZE);
             //Preparar la pagina desde el Backing Store
-            if (fseek(BACKING_STORE, vpn * FRAME_SIZE, SEEK_SET) > 0) {
+            if (fseek(BACKING_STORE, vpn * PAGE_SIZE, SEEK_SET) > 0) {
                 printf("Error al leer el archivo\n");
                 exit(1);
             }
-            if (fread(buffer_pagina, 1, FRAME_SIZE, BACKING_STORE) < 0) {
+            if (fread(buffer_pagina, 1, PAGE_SIZE, BACKING_STORE) < 0) {
                 printf("Error al leer el archivo\n");
                 exit(1);
             }
-            //Cargar la pagina en la memoria fisica
-            memcpy(memoria_fisica + (tabla_paginas[vpn].pfn * FRAME_SIZE), buffer_pagina, FRAME_SIZE);
-            //Actualizar la tabla de paginas
-            tabla_paginas[vpn].pfn = tabla_paginas[vpn].pfn;
-            tabla_paginas[vpn].valido = 1;
+            //Busca un espacio libre en la memoria fisica
+            int i;
+            for (i = 0; i < FRAME_COUNT; i++) {
+                if (memoria_fisica[i]) continue;
+                //Asigna la pagina a la memoria fisica
+                memoria_fisica[i] = buffer_pagina;
+                //Escribe el numero de frame en la tabla de paginas
+                tabla_paginas[vpn].pfn = i;
+                //Escribe que la entrada es valida
+                tabla_paginas[vpn].valido = 1;
+                break;
+            }
         }
         //Obtener el valor de la direccion fisica
         uint32_t direccion_fisica = (tabla_paginas[vpn].pfn * FRAME_SIZE) + offset;
         //Obtener el valor de la direccion fisica
-        int8_t valor = memoria_fisica[direccion_fisica];
+        int8_t valor = memoria_fisica[tabla_paginas[vpn].pfn][offset];
         //Imprimir en la terminal en una sola linea
         printf("Virtual address: %d Physical address: %d Value: %d\n", direccion_virtual, direccion_fisica, valor);
     }

@@ -94,7 +94,8 @@ int main (int argc, char *argv[]) {
         uint32_t direccion_fisica = (tabla_paginas[vpn].pfn * FRAME_SIZE) + offset;
         //Obtener el valor de la direccion fisica
         int8_t valor = memoria_fisica[tabla_paginas[vpn].pfn][offset];
-        //Imprimir en la terminal en una sola linea
-        printf("Virtual address: %d Physical address: %d Value: %d\n", direccion_virtual, direccion_fisica, valor);
+        //Escribir en el archivo de salida
+        fprintf(archivo_salida, "Virtual address: %d Physical address: %d Value: %d\n", direccion_virtual, direccion_fisica, valor);
+        
     }
 }
